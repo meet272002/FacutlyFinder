@@ -1,10 +1,9 @@
-import dbConnection.db_connection as conn
-
 class CreateTable():
-    def __init__(self):
-        self.cursor = conn.SQLConnection.getConnection().cursor()
+    def __init__(self,cursor):
+        self.cursor = cursor
 
     def create_tables(self):
+
         self.cursor.execute("CREATE TABLE IF NOT EXISTS Faculty("
                             "Faculty_id INTEGER PRIMARY KEY AUTOINCREMENT,"
                             "Name TEXT, "
