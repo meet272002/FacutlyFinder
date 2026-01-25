@@ -51,10 +51,9 @@ class PreProcess:
 
     def upsertAtIndex(self, arr, value, idx):
         if value not in arr:
-            return arr  # do nothing if value is not present in this row
+            return arr 
 
-        arr = [x for x in arr if x != value]  # remove it from current position
-
+        arr = [x for x in arr if x != value]  
         if len(arr) > idx:
             arr.insert(idx, value)
         else:
@@ -118,6 +117,3 @@ class PreProcess:
         df_faculty['specialization'] = df_faculty['specialization'].apply(self.parseList)
         df_faculty['Research'] = df_faculty['Research'].apply(self.parseList)
         df_faculty.to_csv(self.DATA_DIR/"faculty.csv",index=False)
-
-pp = PreProcess()
-pp.faculty()
