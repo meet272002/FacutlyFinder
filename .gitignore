@@ -2,4 +2,10 @@
 
 data
 
+database/faculty_managment.db
+
 __pycache__
+
+.idea
+
+.venv
