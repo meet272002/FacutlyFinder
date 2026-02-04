@@ -74,6 +74,9 @@ pandas>=2.0
 beautifulsoup4>=4.12
 fastapi>=0.110
 uvicorn[standard]>=0.27
+streamlit==1.53.1
+sentence-transformers==5.2.2
+torch
 ```
 
 ### Steps to run
@@ -97,4 +100,11 @@ python main.py
 Run:
 ```
 uvicorn FastAPI:app
+```
+
+#### Step 4: Start Client
+
+Run:
+```
+streamlit run ./client/app.py
 ```
