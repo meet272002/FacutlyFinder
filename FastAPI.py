@@ -12,7 +12,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:8501",
-        "https://facutlyfinder-dduo.onrender.com"
+        "https://facutlyfinder-dduo.onrender.com",
+        "https://facutlyfinder-5tnqrfu5mpkdwkvppg2f3x.streamlit.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
