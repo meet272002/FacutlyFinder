@@ -1,10 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
 from dbConnection.db_connection import SQLConnection as sc
 from dbOperations.get_data import GetData
 from contextlib import closing
+import subprocess
+import sys
 
 app = FastAPI()
 
@@ -20,50 +20,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
-
-def get_faculty():
-    conn, status = sc().getConnection()
-    if status != 1:
-        return []
-    with closing(conn):
-        return GetData(conn).get_data()
+@app.get("/faculty")
+def get_faculty_data():
+    data = {}
+    connection = sc().getConnection()
+    connection_status = connection[1]
+    if connection_status != 1:
+        data = {"error":"Database connection failed"}
+    else:
+        with closing(sc().getConnection()[0]) as conn:
+            data_getter = GetData(conn)
+            data = data_getter.get_data()
+    return {"data": data}
 
 @app.get("/")
 def read_root():
-    return {"status": "Server is running"}
-
-@app.get("/faculty")
-def faculty():
-    return {"data": get_faculty()}
-
-@app.post("/recommend")
-def recommend(payload: dict):
-    query = payload["query"].lower()
-    top_n = payload.get("top_n", 5)
-
-    faculty = get_faculty()
-    if not faculty:
-        return {"results": []}
-
-    profiles = [
-        " ".join(
-            f.get("Specializations", []) +
-            f.get("Teachings", []) +
-            f.get("Researches", [])
-        ).lower()
-        for f in faculty
-    ]
-
-    faculty_emb = model.encode(profiles)
-    query_emb = model.encode([query])
-
-    scores = cosine_similarity(query_emb, faculty_emb).flatten()
-    top_idx = scores.argsort()[-top_n:][::-1]
-
-    results = [
-        {"faculty": faculty[i], "score": float(scores[i])}
-        for i in top_idx if scores[i] > 0
-    ]
-
-    return {"results": results}
+    return {"status": "Server is running 🚀"}
