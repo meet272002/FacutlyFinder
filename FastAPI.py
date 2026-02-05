@@ -88,3 +88,7 @@ def get_faculty_data():
             data_getter = GetData(conn)
             data = data_getter.get_data()
     return {"data": data}
+
+@app.get("/")
+def read_root():
+    return {"status": "Server is running 🚀"}
