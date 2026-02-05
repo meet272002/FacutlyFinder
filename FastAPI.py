@@ -1,10 +1,10 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 from dbConnection.db_connection import SQLConnection as sc
 from dbOperations.get_data import GetData
 from contextlib import closing
-import subprocess
-import sys
 
 app = FastAPI()
 
@@ -20,76 +20,50 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# def run_system_tasks():
-#     try:
-#         process = subprocess.Popen(
-#                     [sys.executable, "-m", "scrape.dau.main"],
-#                     stdout=subprocess.PIPE,
-#                     stderr=subprocess.STDOUT,
-#                     text=True,
-#                     bufsize=1  # Line buffered
-#                 )
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
-#         process.wait()  # Wait for it to officially finish
-
-#         if process.returncode == 0:
-#             return {"status": "success", "message": "Data loaded successfully"}
-#         else:
-#             raise HTTPException(status_code=500, detail="Scraper failed")
-#     except subprocess.CalledProcessError as e:
-#         print(f"Error during tasks: {e}")
-
-# def run_system_database():
-#     try:
-#         print("--- Initializing Database ---")
-        
-#         # subprocess.Popen allows us to stream the output
-#         process = subprocess.Popen(
-#             [sys.executable, "main.py"],
-#             stdout=subprocess.PIPE,
-#             stderr=subprocess.STDOUT,
-#             text=True,
-#             bufsize=1 # Line buffered for immediate log printing
-#         )
-
-#         process.wait() # Ensure the process has finished
-
-#         if process.returncode == 0:
-#             return {
-#                 "status": "success", 
-#                 "message": "Database initialized and data loaded successfully."
-#             }
-#         else:
-#             raise HTTPException(
-#                 status_code=500, 
-#                 detail=f"Database script failed with return code {process.returncode}"
-#             )
-#     except subprocess.CalledProcessError as e:
-#         print(f"Error during tasks: {e}")
-
-# @app.get("/run-tasks")
-# def trigger_tasks():
-#     result = run_system_tasks() 
-#     return {"status": "Scraper completed.", "details": result}
-
-# @app.get("/run-tasks-database")
-# def trigger_tasks_database():
-#     result = run_system_database() 
-#     return {"status": "Scraper completed.", "details": result}
-
-@app.get("/faculty")
-def get_faculty_data():
-    data = {}
-    connection = sc().getConnection()
-    connection_status = connection[1]
-    if connection_status != 1:
-        data = {"error":"Database connection failed"}
-    else:
-        with closing(sc().getConnection()[0]) as conn:
-            data_getter = GetData(conn)
-            data = data_getter.get_data()
-    return {"data": data}
+def get_faculty():
+    conn, status = sc().getConnection()
+    if status != 1:
+        return []
+    with closing(conn):
+        return GetData(conn).get_data()
 
 @app.get("/")
 def read_root():
-    return {"status": "Server is running 🚀"}
+    return {"status": "Server is running"}
+
+@app.get("/faculty")
+def faculty():
+    return {"data": get_faculty()}
+
+@app.post("/recommend")
+def recommend(payload: dict):
+    query = payload["query"].lower()
+    top_n = payload.get("top_n", 5)
+
+    faculty = get_faculty()
+    if not faculty:
+        return {"results": []}
+
+    profiles = [
+        " ".join(
+            f.get("Specializations", []) +
+            f.get("Teachings", []) +
+            f.get("Researches", [])
+        ).lower()
+        for f in faculty
+    ]
+
+    faculty_emb = model.encode(profiles)
+    query_emb = model.encode([query])
+
+    scores = cosine_similarity(query_emb, faculty_emb).flatten()
+    top_idx = scores.argsort()[-top_n:][::-1]
+
+    results = [
+        {"faculty": faculty[i], "score": float(scores[i])}
+        for i in top_idx if scores[i] > 0
+    ]
+
+    return {"results": results}
