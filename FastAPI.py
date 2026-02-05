@@ -1,9 +1,10 @@
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dbConnection.db_connection import SQLConnection as sc
 from dbOperations.get_data import GetData
 from contextlib import closing
 import subprocess
+import sys
 
 app = FastAPI()
 
@@ -19,19 +20,61 @@ app.add_middleware(
 
 def run_system_tasks():
     try:
-        print("Running scraper...")
-        subprocess.run(["python", "-m", "scrape.dau.main"], check=True)
-        print("Tasks completed successfully!")
+        process = subprocess.Popen(
+                    [sys.executable, "-m", "scrape.dau.main"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1  # Line buffered
+                )
 
-        print("Initializing database...")
-        subprocess.run(["python", "main.py"], check=True)
+        process.wait()  # Wait for it to officially finish
+
+        if process.returncode == 0:
+            return {"status": "success", "message": "Data loaded successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Scraper failed")
+    except subprocess.CalledProcessError as e:
+        print(f"Error during tasks: {e}")
+
+def run_system_database():
+    try:
+        print("--- Initializing Database ---")
+        
+        # subprocess.Popen allows us to stream the output
+        process = subprocess.Popen(
+            [sys.executable, "main.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1 # Line buffered for immediate log printing
+        )
+
+        process.wait() # Ensure the process has finished
+
+        if process.returncode == 0:
+            return {
+                "status": "success", 
+                "message": "Database initialized and data loaded successfully."
+            }
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Database script failed with return code {process.returncode}"
+            )
     except subprocess.CalledProcessError as e:
         print(f"Error during tasks: {e}")
 
 @app.get("/run-tasks")
-def trigger_tasks(background_tasks: BackgroundTasks):
-    background_tasks.add_task(run_system_tasks)
-    return {"status": "Database init and Scraper started in the background."}
+def trigger_tasks():
+    result = run_system_tasks() 
+    return {"status": "Scraper completed.", "details": result}
+
+@app.get("/run-tasks-database")
+def trigger_tasks_database():
+    result = run_system_database() 
+    return {"status": "Scraper completed.", "details": result}
+
 
 @app.get("/faculty")
 def get_faculty_data():
