@@ -21,52 +21,73 @@ Build a data pipeline to crawl, extract, and clean faculty data (names, bios, re
 
 ## Process Overview
 
-The project follows a clear multi-stage pipeline. First, the `scrape/dau/` module is responsible for collecting faculty URLs and detailed faculty information from the DAU website and storing the raw scraped data as CSV files in the data/ folder. This raw data is then passed to the `preprocess/` module, which cleans, normalizes, and formats it so that it is consistent and ready for database insertion. Database handling is split into two layers: `dbConnection/` manages the SQLite connection, while `dbOperations/` creates the required tables and inserts the processed records into the `faculty_managment.db` file located in the `database/` directory. Finally, the API layer defined in `FastAPI.py` exposes endpoints to query and serve the stored faculty data, and the root `main.py` coordinates the overall workflow from data preparation to database population and API readiness.
+The project follows a structured, multi-stage data and application pipeline. It begins with the `scrape/dau/` module, which crawls the DAU faculty website to collect faculty profile URLs and detailed information such as names, bios, teaching areas, and research interests. The scraped content is stored as raw CSV files in the `data/` directory.
+
+The raw data is then processed by the `preprocess/` module, which cleans, normalizes, and standardizes the extracted information to ensure consistency across records. After preprocessing, database management is handled in two layers: `dbConnection/` establishes and manages the SQLite database connection, while `dbOperations/` is responsible for creating tables and inserting the processed faculty records into the `faculty_managment.db` database located in the `database/` directory. The root `main.py` orchestrates this end-to-end workflow, from data preparation to database population.
+
+Once the database is ready, the backend service defined in `FastAPI.py` exposes RESTful endpoints that allow client applications to retrieve faculty data in JSON format. These endpoints act as the data access layer for downstream applications.
+
+On the frontend, the Streamlit client implemented in `client/app.py` consumes the FastAPI endpoints to fetch faculty data and provides an interactive semantic search interface. User queries describing research interests are converted into vector embeddings using a pre-trained SentenceTransformer model (`paraphrase-MiniLM-L3-v2`). Faculty profiles—constructed from specializations, teaching areas, and research descriptions—are also embedded into the same vector space. Cosine similarity is then used to rank faculty members based on semantic relevance to the user’s query, and the top matches are displayed along with match scores.
+
+This architecture enables an end-to-end faculty recommendation system, integrating web scraping, data preprocessing, database management, API services, and semantic search into a unified pipeline.
 
 ## Folder Structure
 
 ```
-FACULTYFINDER/
+FacultyFinder/
+│
+├── client/
+│   └── app.py                 # Streamlit frontend
 │
 ├── data/
 │   ├── dau-faculty.csv
 │   └── faculty.csv
 │
 ├── database/
-│   └── faculty_managment.db
+│   └── faculty_managment.db   # SQLite database
 │
 ├── dbConnection/
-│   └── db_connection.py
+│   └── db_connection.py       # Database connection utilities
 │
 ├── dbOperations/
-│   ├── get_data.py
-│   ├── tables_create.py
-│   └── tables_insert.py
+│   ├── get_data.py            # Data retrieval queries
+│   ├── tables_create.py       # Table creation logic
+│   └── tables_insert.py       # Data insertion logic
 │
 ├── preprocess/
-│   └── preprocess.py
+│   └── preprocess.py          # Data cleaning and normalization
 │
 ├── scrape/
 │   └── dau/
 │       ├── __init__.py
-│       ├── faculty_details.py
-│       ├── faculty_url.py
-│       └── main.py
+│       ├── faculty_url.py     # Faculty URL extraction
+│       ├── faculty_details.py # Faculty detail scraping
+│       └── main.py            # Scraping entry point
 │
+├── images/
+│   └── Screenshot-1.png       # Project screenshots
+│
+├── __pycache__/               # Python cache files
+│
+├── backend.sh                 # Script to start FastAPI backend
+├── frontend.sh                # Script to start Streamlit frontend
+├── FastAPI.py                 # FastAPI application
+├── main.py                    # Pipeline orchestration script
+├── Log_LLM.md                 # LLM interaction logs
+├── requirements.txt           # Python dependencies
 ├── .gitignore
-├── FastAPI.py
-├── main.py
 └── README.md
 ```
 
-* `scrape/dau/` – Web scraping logic (URLs, faculty details, entry point)
-* `preprocess/` – Data cleaning and transformation
-* `data/` – Scraped CSV datasets
-* `database/` – SQLite database file
-* `dbConnection/` – Database connection utilities
-* `dbOperations/` – Table creation, insertion, and data access
-* `FastAPI.py` – FastAPI application
-* `main.py` – Main execution script
+* **client/** – Streamlit-based frontend interface
+* **scrape/** – Web scraping modules for faculty data
+* **preprocess/** – Data cleaning and transformation logic
+* **data/** – Raw and processed CSV datasets
+* **database/** – SQLite database storage
+* **dbConnection/** – Database connection handling
+* **dbOperations/** – Table creation, insertion, and queries
+* **images/** – Screenshots used in documentation
+* **backend.sh / frontend.sh** – One-command scripts to run backend and frontend
 
 ## Statistics
 
