@@ -1,5 +1,9 @@
 # Faculty Finder
 
+Live Link: https://facutlyfinder-5tnqrfu5mpkdwkvppg2f3x.streamlit.app/
+
+![](./images/Screenshot-1.png)
+****
 ## Objective
 
 Build a data pipeline to crawl, extract, and clean faculty data (names, bios, research interests) from a college website to provide a clean dataset for a semantic search engine.
@@ -64,6 +68,31 @@ FACULTYFINDER/
 * `FastAPI.py` – FastAPI application
 * `main.py` – Main execution script
 
+## Statistics
+
+* Names: 112 (all unique)
+* Emails: 111 non-null, all unique
+* Phone numbers: 80 non-null, 78 unique
+* Faculty websites: 47 available
+* Bios: 70 available
+* Teaching info: 59 available
+* Education field: 110 available
+* Specialization: 109 available (some empty lists)
+* Research info: mostly empty
+* Room numbers: 75 available
+
+**Education distribution**
+* Most common degree: PhD (Computer Science) 16 faculty
+* Total distinct education entries: 60
+
+**Institutes**
+* Most common education institute: DA-IICT Gandhinagar 7 faculty
+* Teaching institute: DAU 75 faculty
+
+**Countries (education)**
+* Total countries: 16
+* Top country: USA (13 faculty)
+
 ## How to Run
 
 ### Requirements
@@ -108,3 +137,5 @@ Run:
 ```
 streamlit run ./client/app.py
 ```
+
+**IMPORTANT NOTE**: One can use `backend.sh` and `frontend.sh` scripts to run the application.
