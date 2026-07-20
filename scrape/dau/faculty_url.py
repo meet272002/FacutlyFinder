@@ -8,7 +8,7 @@ def facultyUrls(url, verbose=False):
         
         soup = BeautifulSoup(html, "html.parser")
 
-        cards = soup.select("div.personalDetails, div.personalDetail, div.personalsDetails")
+        cards = soup.select("div.personalDetails, div.personalDetail, div.personalsDetails, div.personalDetailsGer,div.personalDetails div.personalDetailsGer")
         
         faculty_urls = [
             card.find("a")["href"]

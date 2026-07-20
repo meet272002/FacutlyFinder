@@ -5,3 +5,4 @@ beautifulsoup4>=4.12
 streamlit==1.53.1
 sentence-transformers==5.2.2
 torch
+plotly>=5.17

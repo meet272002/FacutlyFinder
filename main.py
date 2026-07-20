@@ -1,6 +1,6 @@
-from dbOperations.tables_create import CreateTable
-from dbOperations.tables_insert import InsertValues
-from dbConnection.db_connection import SQLConnection as sc
+from server.dbOperations.tables_create import CreateTable
+from server.dbOperations.tables_insert import InsertValues
+from server.dbConnection.db_connection import SQLConnection as sc
 from contextlib import closing
 from preprocess.preprocess import PreProcess as pp
 
@@ -8,9 +8,6 @@ from preprocess.preprocess import PreProcess as pp
 def main():
     conn = sc()
     connection = conn.getConnection()
-    # print(connection[0].cursor())
-
-    
     if connection[1] == 1:
         with closing(connection[0]) as con:
             pre_process = pp()

@@ -1,65 +1,179 @@
 import streamlit as st
 import requests
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
 
-st.set_page_config(page_title="Faculty Matcher", layout="wide")
+st.set_page_config(page_title="Advisor Matcher", layout="wide")
+st.title("Advisor Matching Platform")
 
-class FacultyRecommender:
-    def __init__(self, api_url):
-        self.api_url = api_url
-        self.model = SentenceTransformer('paraphrase-MiniLM-L3-v2', device="cpu")
+# Add navigation in sidebar
+page = st.sidebar.radio(
+    "Navigation",
+    ["Search Faculty", "Compare Faculty"],
+    help="Switch between searching and comparing faculty"
+)
 
-    def fetch_data(self):
+st.markdown("---")
+
+API_BASE = "http://localhost:8005"
+
+if page == "Search Faculty":
+    st.markdown("Enter your interests below to find the most relevant faculty members for your research or studies.")
+
+    with st.sidebar:
+        st.header("Search Parameters")
+        user_input = st.text_area(
+            "Your Interests",
+            placeholder="e.g. Machine Learning, Cyber Security, Blockchain..."
+        )
+        num_rec = st.slider("Number of recommendations", 1, 10, 5)
+        find_btn = st.button("Find Matches", type="primary")
+
+    if find_btn and user_input:
         try:
-            response = requests.get(f"{self.api_url}/faculty")
-            return response.json()['data']
-        except:
-            return []
-
-    def recommend(self, user_query, faculty_data, top_n=3):
-        profiles = [
-            " ".join(f.get("Specializations", []) + f.get("Teachings", []) + f.get("Researches", [])).lower()
-            for f in faculty_data
-        ]
-
-        faculty_embeddings = self.model.encode(profiles)
-        user_embedding = self.model.encode([user_query.lower()])
-
-        scores = cosine_similarity(user_embedding, faculty_embeddings).flatten()
-        
-        top_indices = scores.argsort()[-top_n:][::-1]
-        return [(faculty_data[i], scores[i]) for i in top_indices if scores[i] > 0]
-
-st.title("Faculty Recommendation System")
-st.markdown("Enter your interests below to find the most relevant faculty members for your research or studies.")
-
-with st.sidebar:
-    st.header("Search Parameters")
-    user_input = st.text_area("Your Interests", placeholder="e.g. Machine Learning, Cyber Security, Blockchain...")
-    num_rec = st.slider("Number of recommendations", 1, 10, 5)
-    find_btn = st.button("Find Matches", type="primary")
-
-recommender = FacultyRecommender("https://facutlyfinder-backend.onrender.com")
-data = recommender.fetch_data()
-
-if find_btn and user_input:
-    if not data:
-        st.error("Could not connect to the Faculty API. Please ensure your FastAPI server is running.")
-    else:
-        results = recommender.recommend(user_input, data, top_n=num_rec)
-        
-        if not results:
-            st.warning("No close matches found. Try using different keywords.")
+            resp = requests.get(
+                f"{API_BASE}/search/faculty",
+                params={"query": user_input, "top_n": num_rec},
+                timeout=30,
+            )
+        except requests.exceptions.RequestException:
+            st.error("Could not reach the Faculty API. Is the FastAPI server running?")
         else:
-            st.subheader(f"Top {len(results)} Faculty Matches")
-            
-            for faculty, score in results:
-                with st.expander(f"{faculty['Name']} - {int(score*100)}% Match"):
-                        st.write("**Specialization:**")
-                        st.caption(", ".join(faculty.get("Specializations", [])))
-                        st.write("**Current Research:**")
-                        st.caption(", ".join(faculty.get("Researches", [])))
+            if resp.status_code != 200:
+                st.error(f"API error {resp.status_code}: {resp.text}")
+            else:
+                results = resp.json().get("results", [])
 
-elif not find_btn:
-    st.info("Enter your preferences in the sidebar and click 'Find Matches'.")
+                if not results:
+                    st.warning("No close matches found. Try using different keywords.")
+                else:
+                    st.subheader(f"Top {len(results)} Faculty Matches")
+                    for faculty in results:
+                        score = faculty.get("similarity", 0)
+                        with st.expander(f"{faculty['name']} — {int(score * 100)}% Match"):
+                            st.write("**Email:**")
+                            st.caption(faculty.get("email", "N/A"))
+                            st.write("**Specialization:**")
+                            st.caption(", ".join(faculty.get("specializations", [])) or "N/A")
+                            st.write("**Current Research:**")
+                            st.caption(", ".join(faculty.get("researches", [])) or "N/A")
+
+    elif not find_btn:
+        st.info("Enter your preferences in the sidebar and click 'Find Matches'.")
+elif page == "Compare Faculty":
+    st.markdown("Select 2-5 faculty members to compare their profiles, research interests, and specializations.")
+    
+    # Fetch all faculty for dropdown
+    try:
+        response = requests.get(f"{API_BASE}/compare/get_faculty")  # Adjust URL if needed
+        if response.status_code == 200:
+            all_faculty = response.json().get('data', [])
+            faculty_dict = {f['Name']: f['Faculty_id'] for f in all_faculty}
+            
+            # Multi-select dropdown
+            selected_names = st.multiselect(
+                "Choose 2-5 faculty members to compare",
+                options=list(faculty_dict.keys()),
+                max_selections=5,
+                help="Select multiple faculty to compare their profiles"
+            )
+            
+            if len(selected_names) >= 2:
+                selected_ids = [faculty_dict[name] for name in selected_names]
+                
+                # Call FastAPI comparison endpoint
+                ids_str = ','.join(map(str, selected_ids))
+                comp_response = requests.get(f"{API_BASE}/compare/faculty/{ids_str}")
+                
+                if comp_response.status_code == 200:
+                    comparison_data = comp_response.json().get('data', {})
+                    
+                    report = comparison_data
+
+                    if 'error' in report:
+                        st.warning(report['error'])
+                        st.stop()
+
+                    # ── Faculty profile cards ─────────────────────────────────────
+                    st.subheader("Faculty Profiles")
+
+                    faculties = report.get('faculty', [])
+                    spec_by_faculty = report.get('specialization_comparison', {}).get('by_faculty', {})
+                    edu_by_faculty = report.get('education_comparison', {}).get('by_faculty', {})
+
+                    profile_cols = st.columns(len(faculties))
+                    for col, faculty in zip(profile_cols, faculties):
+                        with col:
+                            name = faculty['name']
+                            st.markdown(f"### {name}")
+
+                            degree = edu_by_faculty.get(name)
+                            if degree and degree != 'N/A':
+                                st.caption(degree)
+
+                            st.divider()
+
+                            specs = spec_by_faculty.get(name, [])
+                            if specs:
+                                st.markdown("**Specializations:**")
+                                for s in specs[:5]:
+                                    st.caption(f"• {s}")
+                                if len(specs) > 5:
+                                    st.caption(f"_+{len(specs) - 5} more_")
+                            else:
+                                st.caption("_No specializations listed_")
+
+                    st.divider()
+
+                    # ── Overall similarity ────────────────────────────────────────
+                    st.subheader("Comparison Analysis")
+
+                    overall = report.get('overall_similarity', {})
+                    for pair, vals in overall.items():
+                        st.metric(pair, f"{vals['overall_score']}%")
+                        breakdown_cols = st.columns(4)
+                        for bcol, (dim, val) in zip(breakdown_cols, vals['breakdown'].items()):
+                            bcol.caption(dim.title())
+                            bcol.write(f"**{val}%**")
+                        st.divider()
+
+
+                    # ── Per-dimension detail ──────────────────────────────────────
+                    def render_dimension(title, section):
+                        if not section or not section.get('pairwise'):
+                            return
+
+                        st.subheader(title)
+                        for pair, vals in section['pairwise'].items():
+                            st.markdown(f"**{pair}** — {round(vals['score'] * 100, 1)}%")
+
+                            exact = vals.get('exact_matches', [])
+                            st.write(f"Shared: {', '.join(exact)}" if exact else "No exact matches")
+
+                            for s in vals.get('similar_pairs', []):
+                                st.caption(f"{s['from']} ≈ {s['to']} ({round(s['similarity'] * 100)}%)")
+                        st.divider()
+
+
+                    render_dimension("Specializations", report.get('specialization_comparison'))
+                    render_dimension("Research Interests", report.get('research_comparison'))
+                    render_dimension("Teaching Areas", report.get('teaching_comparison'))
+
+                    # ── Education ─────────────────────────────────────────────────
+                    edu = report.get('education_comparison', {})
+                    if edu.get('pairwise'):
+                        st.subheader("Education")
+                        for pair, vals in edu['pairwise'].items():
+                            tag = " — same degree" if vals.get('same_degree') else ""
+                            st.write(f"{pair}: {round(vals['score'] * 100, 1)}%{tag}")
+                else:
+                    st.error("Error fetching comparison data from server")
+            
+            elif len(selected_names) > 0:
+                st.warning("Please select at least 2 faculty members to compare")
+            else:
+                st.info("Select faculty members from the dropdown above")
+                
+        else:
+            st.error("Could not load faculty list")
+            
+    except Exception as e:
+        st.error(f"Error: {e}")
